@@ -1,9 +1,11 @@
 var Bblck = (function (window) {
 
 	var	doc = window.document,
+		sessionStorage = window.sessionStorage,
 		PRIVATE = {},
 		PUBLIC = {},
-		storage = {},
+		STORAGE = {},
+		mainStorageFactoryType = 'bblock_action_history',
 		ClassResponse = function () {};
 
 
@@ -15,42 +17,6 @@ var Bblck = (function (window) {
 
 	PRIVATE.panel_root = null;
 
-	PRIVATE.StoragePath = {
-		get: function (path) {
-			var listPath = path.split('.'),
-				listPathLen = listPath.length,
-				store = PRIVATE.storage;
-			for (var i = 0; i < listPathLen; i ++) {
-				store = store[listPath[i]];
-			}
-			return store;
-		},
-		create: function (path) {
-			var listPath = path.split('.'),
-				listPathLen = listPath.length,
-				store = PRIVATE.storage;
-			for (var i = 0; i < listPathLen; i ++) {
-				if ( !store[listPath[i]] ) {
-					store[listPath[i]] = ( i === (listPathLen - 1) ) ? [] : {};
-				}
-				store = store[listPath[i]];
-			}
-			return store;
-		},
-		exist: function (path) {
-			var listPath = path.split('.'),
-				listPathLen = listPath.length,
-				store = PRIVATE.storage;
-			for (var i = 0; i < listPathLen; i ++) {
-				if ( !store[listPath[i]] ) {
-					return false;
-				}
-				store = store[listPath[i]];
-			}
-			return true;
-		}
-	};
-
 	PRIVATE.Iterator = function (type, index) {
 		this.prev = function () {
 			var newIndex = index - 1;
@@ -61,12 +27,16 @@ var Bblck = (function (window) {
 		};
 
 		this.item = function () {
-			return PRIVATE.storage[type][index];
+			var store = JSON.parse(sessionStorage.getItem(type));
+			if ( store === null ) {
+				return store;
+			}
+			return store[index];
 		};
 
 		this.next = function () {
 			var newIndex = index + 1;
-			if (newIndex <= (PRIVATE.storage[type].length - 1)) {
+			if (newIndex <= (storage[type].length - 1)) {
 				return new PRIVATE.Iterator(newIndex);
 			}
 			return null;
@@ -75,22 +45,24 @@ var Bblck = (function (window) {
 
 	PRIVATE.StorageFactory = function (type) {
 
+		sessionStorage.removeItem(type);
+
 		this.save = function (obj) {
-			var store = PRIVATE.storage;
-			if ( !PRIVATE.StoragePath.exist(type) ) {
-				store = PRIVATE.StoragePath.create(type);
+			var store = JSON.parse(sessionStorage.getItem(type));
+			if ( store === null ) {
+				store = [];
 			}
 			store.push(obj);
-			PRIVATE.storage = store;
+			sessionStorage.setItem(type, JSON.stringify(store));
 			return obj;
 		};
 
 		this.delete = function (index) {
-			if ( PRIVATE.StoragePath.exist(type) ) {
+			var store = JSON.parse(sessionStorage.getItem(type));
+			if ( store !== null ) {
 				try {
-					var store = PRIVATE.StoragePath.get(type);
 					store.splice(index, 1);
-					PRIVATE.storage = store;
+					sessionStorage.setItem(type, JSON.stringify(store));
 					return true;
 				} catch (e) {
 					return false;
@@ -100,19 +72,25 @@ var Bblck = (function (window) {
 		};
 
 		this.find = function (index) {
-			if ( !PRIVATE.StoragePath.exist(type) ) {
-				return null;
+			var store = JSON.parse(sessionStorage.getItem(type));
+			if ( store === null ) {
+				return store;
 			}
-			var store = PRIVATE.StoragePath.get(type);
 			return store[index];
 		};
 
+		this.findAll = function () {
+			var store = JSON.parse(sessionStorage.getItem(type));
+			return store;
+		};
+
 		this.findLast = function () {
-			if ( !PRIVATE.StoragePath.exist(type) ) {
-				return null;
+			var store = JSON.parse(sessionStorage.getItem(type));
+			if ( store === null ) {
+				return store;
 			}
-			var store = PRIVATE.StoragePath.get(type),
-				lastIndex = store.length - 1;
+
+			var lastIndex = store.length - 1;
 			if ( lastIndex >= 0 ) {
 				return store[lastIndex];
 			}
@@ -120,18 +98,18 @@ var Bblck = (function (window) {
 		};
 
 		this.findFirst = function () {
-			if ( !PRIVATE.StoragePath.exist(type) ) {
-				return null;
+			var store = JSON.parse(sessionStorage.getItem(type));
+			if ( store === null ) {
+				return store;
 			}
-			var store = PRIVATE.StoragePath.get(type);
 			return store[0];
 		};
 
 		this.count = function () {
-			if ( !PRIVATE.StoragePath.exist(type) ) {
-				return 0;
+			var store = JSON.parse(sessionStorage.getItem(type));
+			if ( store === null ) {
+				return store;
 			}
-			var store = PRIVATE.StoragePath.get(type);
 			return store.length;
 		};
 	};
@@ -149,6 +127,7 @@ var Bblck = (function (window) {
 				actionKey: window.btoa(unescape(encodeURIComponent( description + (new Date()).getTime() ))),
 
 				onAction: function () {},
+				afterAction: function () {},
 				onReturn: function () {},
 				onException: function () {}
 			},
@@ -222,13 +201,15 @@ var Bblck = (function (window) {
 				};
 				try {
 					self.getOption('onAction')(event, obj);
-					history.save({
-						button: self,
-						date: (new Date()).toLocaleFormat()
-					});
 					if ( self.getNextPanel() !== undefined ) {
+						history.save({
+							key: self.getOption('actionKey'),
+							date: (new Date()).toLocaleFormat()
+						});
+						STORAGE[self.getOption('actionKey')] = self;
 						self.getNextPanel().create(trgt, history);
 					}
+					self.getOption('afterAction')(event, obj);
 				} catch (error) {
 					self.getOption('onException')(error, obj);
 				}
@@ -285,13 +266,11 @@ var Bblck = (function (window) {
 					button = new PUBLIC.Button('Voltar', returnButtonOptions);
 					button.setOption('onAction', function (event, obj) {
 						var hstr = obj.getHistory(),
-							lastIndex = hstr.count - 1,
-							prev = lastIndex - 1,
-							prevData = hstr.find(prev),
-							prevButton = prevData.button;
-
-						hstr.delete(lastIndex);
-						prevButton.onReturn(obj);
+							prevIndex = hstr.count() - 1,
+							prevStorage = hstr.find(prevIndex),
+							prevButton = STORAGE[prevStorage.key];
+						hstr.delete(prevIndex);
+						prevButton.getOption('onReturn')(obj);
 						prevButton.getCurrentPanel().create(obj.getTarget(), hstr);
 					});
 				}
@@ -365,7 +344,7 @@ var Bblck = (function (window) {
 	};
 
 	PUBLIC.render = function () {
-		var history = new PRIVATE.StorageFactory('action_history'),
+		var history = new PRIVATE.StorageFactory(mainStorageFactoryType),
 			panel = PUBLIC.getPanelRoot();
 
 		panel.create(PUBLIC.getTarget(), history);
