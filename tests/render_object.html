@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+	<meta charset="UTF-8">
+	<title>Test Buttons Block</title>
+</head>
+<body>
+	<div id="test"></div>
+	<p id="text"></p>
+	<script src="../build/bblcks.js"></script>
+	<script>
+		(function (window) {
+
+			var Bblck = window.Bblck,
+				doc = window.document,
+				block = new Bblck(),
+				text = document.getElementById('text');
+
+			/* Config a panel with buttons*/
+			var panel5 = new block.Panel(null, {}, [
+				new block.Button('Maskada', {}),
+				new block.Button('Illuminatti', {})
+			]);
+
+			/* Config a panel with buttons*/
+			var panel4 = new block.Panel(null, {}, [
+				new block.Button('5 dias', {
+					onAction: function () {
+						text.innerHTML += '5 dias';
+					}
+				}),
+				new block.Button('10 dias', {
+					onAction: function () {
+						text.innerHTML += '10 dias';
+					}
+				}),
+				new block.Button('15 dias', {
+					onAction: function () {
+						text.innerHTML += '15 dias';
+					}
+				}),
+				new block.Button('30 dias', {
+					onAction: function (event, obj) {
+						text.innerHTML += '30 dias';
+						obj.createException('Campo não validado!');
+					},
+					onException: function (error, obj) {
+						window.alert(error.message);
+						obj.getNextPanel().create(obj.getTarget(), obj.getHistory());
+					}
+				}, panel5)
+			]);
+
+			/* Config a panel with buttons*/
+			var panel3 = new block.Panel(null, {}, [
+				new block.Button('Action 2.1', {}),
+				new block.Button('Action 2.2', {})
+			]);
+
+			/* Config a panel with buttons*/
+			var panel2 = new block.Panel(null, {}, [
+				new block.Button('Action 1.1', {}),
+				new block.Button('Action 1.2', {}),
+				new block.Button('Action 1.3', {})
+			]);
+
+			/* Config a panel with buttons*/
+			var panel1 = new block.Panel('Teste de painéis', {}, [
+				new block.Button('Action 1', {}, panel2),
+				new block.Button('Action 2', {}, panel3),
+				new block.Button('Agendar contato', {
+					onAction: function () {
+						text.innerHTML += 'Estou agendando contato para ';
+					}
+				}, panel4)
+			]);
+
+			/* Config the buttons block */
+			block.setPanelRoot(panel1);
+			block.setTarget('#test');
+			block.render();
+
+		})(window);
+	</script>
+</body>
+</html>
