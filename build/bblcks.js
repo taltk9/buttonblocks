@@ -11,6 +11,218 @@ var Bblck = (function (window) {
 
 	/* PRIVATE METHODS */
 
+	PRIVATE.addEvent = function (elem, event, fn) {
+		function listenHandler(e) {
+			var ret = fn.apply(this, arguments);
+			if (ret === false) {
+				e.stopPropagation();
+				e.preventDefault();
+			}
+			return ret;
+		}
+
+		function attachHandler() {
+			var ret = fn.call(elem, window.event);
+			if (ret === false) {
+				window.event.returnValue = false;
+				window.event.cancelBubble = true;
+			}
+			return ret;
+		}
+
+		if (elem.addEventListener) {
+			elem.addEventListener(event, listenHandler, false);
+		} else {
+			elem.attachEvent("on" + event, listenHandler);
+		}
+	};
+
+	PRIVATE.Ajax = (function(window){
+		var xhr = null,
+			AJAX_METHODS = {},
+			AJAX_CONSTRUCT = {},
+			ClassAjax = function () {},
+			notEmpty = function(variable, type) {
+				if (type !== null && type !== undefined && type !== "") {
+					if (variable !== null && variable !== undefined && typeof variable === type) {
+						return true;
+					} else {
+						return false;
+					}
+				} else {
+					if (variable !== null && variable !== undefined && variable !== "") {
+						return true;
+					} else {
+						return false;
+					}
+				}
+			};
+
+		AJAX_CONSTRUCT.XHR = function () {
+			if (typeof XMLHttpRequest !== undefined) {
+				return new XMLHttpRequest();
+			} else {
+				var versions = [
+				"MSXML2.XmlHttp.5.0",
+				"MSXML2.XmlHttp.4.0",
+				"MSXML2.XmlHttp.3.0",
+				"MSXML2.XmlHttp.2.0",
+				"Microsoft.XmlHttp"
+				];
+
+				for(var i = 0; i < versions.length; i++) {
+					try {
+						return new ActiveXObject(versions[i]);
+					}
+					catch(e){
+						throw "Not ActiveXObject";
+					}
+				}
+			}
+		};
+
+		AJAX_METHODS.asyncRequest = function(url, callback) {
+			if (notEmpty(url)) {
+				xhr = new AJAX_CONSTRUCT.XHR();
+				xhr.onreadystatechange = function() {
+					if (notEmpty(callback, "function")) {
+						callback(xhr);
+					}
+				};
+				xhr.open('GET', url, true);
+				xhr.send('');
+			} else {
+				throw "invalid URL on Ajax.asyncRequest method";
+			}
+		};
+
+		AJAX_METHODS.async = function(url, callback) {
+			if (notEmpty(url)) {
+				xhr = new AJAX_CONSTRUCT.XHR();
+				xhr.onreadystatechange = function() {
+					if (xhr.readyState < 4) {
+						return;
+					}
+
+					if (xhr.status !== 200) {
+						return;
+					}
+
+					if (xhr.readyState === 4) {
+						if (notEmpty(callback, "function")) {
+							callback(xhr);
+						}
+					}
+				};
+				xhr.open('GET', url, true);
+				xhr.send('');
+			} else {
+				throw "invalid URL on Ajax.async method";
+			}
+		};
+
+		AJAX_METHODS.sync = function(url) {
+			if (notEmpty(url)) {
+				xhr = new AJAX_CONSTRUCT.XHR();
+				xhr.open('GET', url, false);
+				xhr.send('');
+				return xhr;
+			} else {
+				throw "invalid URL - Ajax.sync method";
+			}
+		};
+
+		AJAX_METHODS.json = function(url, callback) {
+			if (notEmpty(callback, "function")) {
+				AJAX_METHODS.async(url, function(resp){
+					var data = JSON.parse(resp.responseText);
+					callback(data);
+				});
+			} else {
+				return JSON.parse(AJAX_METHODS.sync(url).responseText);
+			}
+		};
+
+		AJAX_METHODS.post = function(form, url, callback) {
+			if (notEmpty(form, "object") && notEmpty(url)) {
+				xhr = new AJAX_CONSTRUCT.XHR();
+				xhr.onreadystatechange = function() {
+					if (xhr.readyState < 4) {
+						return;
+					}
+					if (xhr.status !== 200) {
+						return;
+					}
+					if (xhr.readyState === 4) {
+						if (notEmpty(callback, "function")) {
+							var data = JSON.parse(xhr.responseText);
+							callback(data, xhr);
+						}
+					}
+				};
+
+				xhr.open('POST', url, true);
+				//xhr.setRequestHeader('Content-Type', 'multipart/form-data');
+				if (window.FormData) {
+					var formData = new FormData();
+					for (var i = 0; i < form.elements.length; i ++) {
+						var field = form.elements[i];
+						if (field.name !== "") {
+							formData.append(field.name, field.value);
+						}
+					}
+					xhr.send(formData);
+				}
+			} else {
+				throw "invalid URL or form node object - Ajax.post method";
+			}
+		};
+
+		AJAX_METHODS.postData = function(url, callback, postData) {
+			if (notEmpty(url)) {
+				xhr = new AJAX_CONSTRUCT.XHR();
+				xhr.onreadystatechange = function() {
+					if (xhr.readyState < 4) {
+						return;
+					}
+					if (xhr.status !== 200) {
+						return;
+					}
+					if (xhr.readyState === 4) {
+						if (notEmpty(callback, "function")) {
+							var data = JSON.parse(xhr.responseText);
+							callback(data, xhr);
+						}
+					}
+				};
+
+				xhr.open('POST', url, true);
+				//xhr.setRequestHeader('Content-Type', 'multipart/form-data');
+				if (window.FormData) {
+					var formData = new FormData(),
+						value = null;
+					if ( notEmpty(postData) ) {
+						for (var key in postData) {
+							value = postData[key];
+							if (key !== "") {
+								formData.append(key, value);
+							}
+						}
+					}
+					xhr.send(formData);
+				}
+			} else {
+				throw "invalid URL or form node object - Ajax.post method";
+			}
+		};
+
+		for (var method in AJAX_METHODS) {
+			ClassAjax.prototype[method] = AJAX_METHODS[method];
+		}
+
+		return ClassAjax;
+	})(window);
+
 	PRIVATE.target = 'body';
 
 	PRIVATE.unique_id = (new Date()).getTime();
@@ -121,6 +333,11 @@ var Bblck = (function (window) {
 		var _options = {
 				wrapper: null,
 				wrapperClassName: '',
+				ajaxAction: false,
+				ajaxSource: '',
+				ajaxResponseType: 'JSON',
+				ajaxRequestType: 'GET',
+				ajaxPostData: null,
 				variableName: '$description',
 				htmlContent: null,
 				className: '',
@@ -129,10 +346,12 @@ var Bblck = (function (window) {
 				onAction: function () {},
 				afterAction: function () {},
 				onReturn: function () {},
-				onException: function () {}
+				onException: function () {},
+				beforeAjaxRequest: function () {}
 			},
 			_panel = panel || undefined,
 			_currentPanel = null,
+			firstExec = true,
 			self = this,
 			ActionException = function (message) {
 				this.message = message;
@@ -142,7 +361,7 @@ var Bblck = (function (window) {
 		ActionException.prototype.constructor = ActionException;
 
 		if (options !== null && options !== undefined) {
-			for (key in options) {
+			for (var key in options) {
 				_options[key] = options[key];
 			}
 		}
@@ -160,8 +379,24 @@ var Bblck = (function (window) {
 			return _currentPanel;
 		};
 
+		self.setNextPanel = function (panel) {
+			_panel = panel;
+		};
+
 		self.getNextPanel = function () {
 			return _panel;
+		};
+
+		self.setAsFirstExecution = function (boolean) {
+			firstExec = boolean;
+		};
+
+		self.isFirstExecution = function () {
+			return firstExec;
+		};
+
+		self.clearNextPanel = function () {
+			_panel = undefined;
 		};
 
 		self.setOption = function (optionName, value) {
@@ -191,29 +426,90 @@ var Bblck = (function (window) {
 				);
 			}
 			btn.innerHTML = content;
-			btn.addEventListener("click", function (event) {
+			var cb = function (event) {
 				var obj = {
 					getTarget: function () { return trgt; },
 					getHistory: function () { return history; },
 					createException: self.createException,
 					getNextPanel: self.getNextPanel,
-					getCurrentPanel: self.getCurrentPanel
+					setNextPanel: self.setNextPanel,
+					clearNextPanel: self.clearNextPanel,
+					getActionKey: self.getOption('actionKey'),
+					getCurrentPanel: self.getCurrentPanel,
+					setAsFirstExecution: self.setAsFirstExecution,
+					isFirstExecution: self.isFirstExecution
 				};
 				try {
-					self.getOption('onAction')(event, obj);
-					if ( self.getNextPanel() !== undefined ) {
-						history.save({
-							key: self.getOption('actionKey'),
-							date: (new Date()).toLocaleFormat()
-						});
-						STORAGE[self.getOption('actionKey')] = self;
-						self.getNextPanel().create(trgt, history);
+					if ( self.getOption('ajaxAction') ) {
+						var ajax = new PRIVATE.Ajax(),
+							responseType = 'async',
+							ajaxLoad = ajax.async;
+
+						obj.setAjaxSource = function (value) { self.setOption('ajaxSource', value); };
+						obj.setAjaxPostData = function (value) { self.setOption('ajaxPostData', value); };
+						obj.setAjaxResponseType = function (value) { self.setOption('ajaxResponseType', value); };
+						obj.setAjaxRequestType = function (value) { self.setOption('ajaxRequestType', value); };
+						obj.getAjaxSource = function (value) { return self.getOption('ajaxSource'); };
+						obj.getAjaxPostData = function (value) { return self.getOption('ajaxPostData'); };
+						obj.getAjaxResponseType = function (value) { return self.getOption('ajaxResponseType'); };
+						obj.getAjaxRequestType = function (value) { return self.getOption('ajaxRequestType'); };
+
+						self.getOption('beforeAjaxRequest')(event, obj);
+
+						delete obj.setAjaxSource;
+						delete obj.setAjaxPostData;
+						delete obj.setAjaxResponseType;
+						delete obj.setAjaxRequestType;
+						delete obj.getAjaxSource;
+						delete obj.getAjaxPostData;
+						delete obj.getAjaxResponseType;
+						delete obj.getAjaxRequestType;
+
+						if (self.getOption('ajaxResponseType').toLowerCase() === 'json') {
+							ajaxLoad = ajax.json;
+						}
+						if (self.getOption('ajaxRequestType').toLowerCase() === 'post') {
+							ajaxLoad = ajax.postData;
+						}
+						ajaxLoad(self.getOption('ajaxSource'), function (data) {
+							try {
+								self.getOption('onAction')(event, obj, data);
+								if ( self.getNextPanel() !== undefined ) {
+									history.save({
+										key: self.getOption('actionKey'),
+										date: (new Date()).toLocaleString()
+									});
+									STORAGE[self.getOption('actionKey')] = self;
+									self.getNextPanel().create(trgt, history);
+								}
+								self.getOption('afterAction')(event, obj, data);
+							} catch (error) {
+								self.getOption('onException')(event, obj, error);
+								return true;
+							}
+						}, self.getOption('ajaxPostData'));
+					} else {
+						self.getOption('onAction')(event, obj);
+						if ( self.getNextPanel() !== undefined ) {
+							history.save({
+								key: self.getOption('actionKey'),
+								date: (new Date()).toLocaleString()
+							});
+							STORAGE[self.getOption('actionKey')] = self;
+							self.getNextPanel().create(trgt, history);
+						}
+						self.getOption('afterAction')(event, obj);
 					}
-					self.getOption('afterAction')(event, obj);
 				} catch (error) {
-					self.getOption('onException')(error, obj);
+					self.getOption('onException')(event, obj, error);
+					return true;
 				}
-			}, false);
+			};
+			PRIVATE.addEvent(btn, 'click', function (event) {
+				if ( self.isFirstExecution() ) {
+					cb(event);
+				}
+			});
 
 			if ( self.getOption('wrapper') !== null ) {
 				var wrapper = doc.createElement(self.getOption('wrapper'));
@@ -264,15 +560,17 @@ var Bblck = (function (window) {
 				var returnButtonOptions = _options['returnButton'];
 				if (returnButtonOptions.enabled) {
 					button = new PUBLIC.Button('Voltar', returnButtonOptions);
-					button.setOption('onAction', function (event, obj) {
-						var hstr = obj.getHistory(),
+					if ( !returnButtonOptions.onAction ) {
+						button.setOption('onAction', function (event, obj) {
+							var hstr = obj.getHistory(),
 							prevIndex = hstr.count() - 1,
 							prevStorage = hstr.find(prevIndex),
 							prevButton = STORAGE[prevStorage.key];
-						hstr.delete(prevIndex);
-						prevButton.getOption('onReturn')(obj);
-						prevButton.getCurrentPanel().create(obj.getTarget(), hstr);
-					});
+							hstr.delete(prevIndex);
+							prevButton.getOption('onReturn')(event, obj);
+							prevButton.getCurrentPanel().create(obj.getTarget(), hstr);
+						});
+					}
 				}
 			}
 			return button;
@@ -303,11 +601,9 @@ var Bblck = (function (window) {
 				panel.appendChild(button);
 			}
 
-			if (buttons.length > 0) {
-				if (self.getReturnButton() !== undefined) {
-					button = self.getReturnButton().create(trgt, history);
-					panel.appendChild(button);
-				}
+			if (self.getReturnButton() !== undefined) {
+				button = self.getReturnButton().create(trgt, history);
+				panel.appendChild(button);
 			}
 
 			target.innerHTML = '';
